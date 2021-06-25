@@ -2,7 +2,12 @@
     <app-layout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Chat
+                <chat-room-selection
+                    v-if="currentRoom.id"
+                    :rooms="chatRooms"
+                    :currentRoom="currentRoom"
+                    v-on:roomchanged="setRoom( $event )"
+                />
             </h2>
         </template>
 
@@ -23,12 +28,14 @@
     import AppLayout from '@/Layouts/AppLayout'
     import MessageContainer from './messageContainer.vue'
     import InputMessage from './inputMessage.vue'
+    import ChatRoomSelection from './chatRoomSelection.vue'
 
     export default {
         components: {
             AppLayout,
             MessageContainer,
             InputMessage,
+            ChatRoomSelection,
         },
         data: function () {
             return {
@@ -37,7 +44,28 @@
                 messages: []
             }
         },
+        watch: {
+            currentRoom(val, oldVal) {
+                if(oldVal.id) {
+                    this.disconnect(oldVal);
+                }
+                this.connect();
+            }
+        },
         methods: {
+            connect() {
+                if(this.currentRoom.id) {
+                    let vm = this;
+                    this.getMessages();
+                    window.Echo.private("chat." + this.currentRoom.id)
+                    .listen('.message.new', e => {
+                        vm.getMessages();
+                    });
+                }
+            },
+            disconnect(room) {
+                window.Echo.leave("chat." + room.id);
+            },
             getRooms() {
                axios.get('/chat/rooms')
                .then(respnose => {
@@ -50,7 +78,6 @@
             },
             setRoom(room) {
                 this.currentRoom = room;
-                this.getMessages();
             },
             getMessages(){
                 axios.get('chat/room/' + this.currentRoom.id + '/messages')
